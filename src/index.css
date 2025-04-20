@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-color: #FF6B6B;
+  --primary-dark-color: #FF5252;
+  --secondary-color: #4ECDC4;
+  --accent-color: #FFD166;
+  --background-color: #FAFAFA;
+  --text-color: #333333;
+}
+
+@layer base {
+  body {
+    @apply font-inter bg-gray-50 text-gray-800;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-poppins font-semibold;
+  }
+
+  .container {
+    @apply w-full max-w-7xl mx-auto px-4;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-primary text-white rounded-full hover:bg-primary-dark transition-all transform hover:scale-105 inline-block shadow-md;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 bg-transparent border-2 border-white text-white rounded-full hover:bg-white hover:text-gray-900 transition-all transform hover:scale-105 inline-block;
+  }
+
+  .section-title {
+    @apply text-3xl md:text-4xl font-bold mb-4 font-poppins;
+  }
+
+  .section-description {
+    @apply text-gray-600 max-w-2xl mx-auto text-lg mb-12;
+  }
+}
+
+/* Food card animations */
+.food-card {
+  @apply transition-all duration-300;
+}
+
+.food-card:hover {
+  @apply transform -translate-y-2 shadow-lg;
+}
+
+/* Button animations */
+.btn {
+  @apply transition-all duration-300;
+}
+
+.btn:hover {
+  @apply transform -translate-y-1;
+}
+
+.btn:active {
+  @apply transform translate-y-0;
+}
+
+/* Cart shake animation */
+@keyframes cartShake {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(5deg); }
+  30% { transform: rotate(-5deg); }
+  45% { transform: rotate(4deg); }
+  60% { transform: rotate(-4deg); }
+  75% { transform: rotate(2deg); }
+  85% { transform: rotate(-2deg); }
+  92% { transform: rotate(1deg); }
+  100% { transform: rotate(0); }
+}
+
+.cart-shake {
+  animation: cartShake 0.6s ease-in-out;
+} 
