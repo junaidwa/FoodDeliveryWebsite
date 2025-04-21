@@ -1,0 +1,324 @@
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaUser, FaLock, FaEnvelope, FaPhone, FaCheckCircle } from 'react-icons/fa';
+import Navbar from '../components/Navbar';
+
+const SignUp = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+  });
+  
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  
+  const navigate = useNavigate();
+  
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+    
+    // Clear error when typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
+      });
+    }
+  };
+  
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+    
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    // Phone validation
+    if (!formData.phone) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^\+?[0-9]{10,15}$/.test(formData.phone.replace(/\s/g, ''))) {
+      newErrors.phone = 'Phone number is invalid';
+    }
+    
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.confirmPassword !== formData.password) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (validateForm()) {
+      setLoading(true);
+      
+      // Simulate API call
+      setTimeout(() => {
+        setLoading(false);
+        
+        // Check if email already exists
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const emailExists = users.some(user => user.email === formData.email);
+        
+        if (emailExists) {
+          setErrors({
+            ...errors,
+            email: 'Email is already registered'
+          });
+          return;
+        }
+        
+        // Store user in localStorage (in a real app, this would be a backend API call)
+        const newUser = {
+          id: Date.now(),
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password, // In real app, NEVER store passwords in plain text
+          isAdmin: false,
+          createdAt: new Date().toISOString()
+        };
+        
+        localStorage.setItem('users', JSON.stringify([...users, newUser]));
+        
+        // Show success message
+        setSuccess(true);
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }, 1500);
+    }
+  };
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      
+      <div className="pt-32 pb-16 px-4">
+        <div className="max-w-lg mx-auto">
+          <AnimatePresence>
+            {success ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="bg-white rounded-lg shadow-lg p-8 text-center"
+              >
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FaCheckCircle className="text-green-500 text-3xl" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Registration Successful!</h2>
+                <p className="text-gray-600 mb-6">Your account has been created. Redirecting to login...</p>
+                <div className="w-16 h-1 bg-primary mx-auto">
+                  <motion.div
+                    className="h-full bg-green-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 2 }}
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white rounded-lg shadow-lg overflow-hidden"
+              >
+                <div className="bg-primary py-6 px-8">
+                  <motion.h2 
+                    className="text-2xl font-bold text-white text-center"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.5 }}
+                  >
+                    Create Your Account
+                  </motion.h2>
+                  <motion.p 
+                    className="text-white text-opacity-90 text-center mt-1"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3, duration: 0.5 }}
+                  >
+                    Join TastyBites and enjoy delicious food delivered to your door
+                  </motion.p>
+                </div>
+                
+                <div className="p-8">
+                  <form onSubmit={handleSubmit}>
+                    <div className="mb-5">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="name">
+                        Full Name
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaUser className="text-gray-400" />
+                        </div>
+                        <input
+                          id="name"
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          className={`block w-full pl-10 pr-3 py-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
+                    </div>
+                    
+                    <div className="mb-5">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="email">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaEnvelope className="text-gray-400" />
+                        </div>
+                        <input
+                          id="email"
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          className={`block w-full pl-10 pr-3 py-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                      {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
+                    </div>
+                    
+                    <div className="mb-5">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="phone">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaPhone className="text-gray-400" />
+                        </div>
+                        <input
+                          id="phone"
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          className={`block w-full pl-10 pr-3 py-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          placeholder="+12345678901"
+                        />
+                      </div>
+                      {errors.phone && <p className="mt-1 text-sm text-red-500">{errors.phone}</p>}
+                    </div>
+                    
+                    <div className="mb-5">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaLock className="text-gray-400" />
+                        </div>
+                        <input
+                          id="password"
+                          type="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleChange}
+                          className={`block w-full pl-10 pr-3 py-3 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                      {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
+                    </div>
+                    
+                    <div className="mb-6">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="confirmPassword">
+                        Confirm Password
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaLock className="text-gray-400" />
+                        </div>
+                        <input
+                          id="confirmPassword"
+                          type="password"
+                          name="confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={handleChange}
+                          className={`block w-full pl-10 pr-3 py-3 border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                      {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>}
+                    </div>
+                    
+                    <div className="mb-6">
+                      <motion.button
+                        type="submit"
+                        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Creating account...
+                          </>
+                        ) : (
+                          'Create Account'
+                        )}
+                      </motion.button>
+                    </div>
+                  </form>
+                  
+                  <div className="text-sm text-center text-gray-600">
+                    Already have an account?{' '}
+                    <Link to="/login" className="font-medium text-primary hover:text-primary-dark">
+                      Sign in
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SignUp; 
