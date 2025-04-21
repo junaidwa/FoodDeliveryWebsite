@@ -491,13 +491,13 @@ const Home = ({ addToCart }) => {
               </p>
               <div className="flex items-center">
                 <img 
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80" 
-                  alt="Customer" 
+                  src="https://randomuser.me/api/portraits/men/32.jpg" 
+                  alt="Muhammad Junaid" 
                   className="w-12 h-12 rounded-full mr-4 object-cover"
                 />
                 <div>
-                  <h4 className="font-semibold">Jessica Williams</h4>
-                  <p className="text-gray-500 text-sm">Food Enthusiast</p>
+                  <h4 className="font-semibold">Muhammad Junaid</h4>
+                  <p className="text-gray-500 text-sm">Mianwali, Pakistan</p>
                 </div>
               </div>
             </motion.div>
@@ -520,13 +520,13 @@ const Home = ({ addToCart }) => {
               </p>
               <div className="flex items-center">
                 <img 
-                  src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80" 
-                  alt="Customer" 
+                  src="https://randomuser.me/api/portraits/men/41.jpg" 
+                  alt="Muhammad Nouman" 
                   className="w-12 h-12 rounded-full mr-4 object-cover"
                 />
                 <div>
-                  <h4 className="font-semibold">Alex Johnson</h4>
-                  <p className="text-gray-500 text-sm">Regular Customer</p>
+                  <h4 className="font-semibold">Muhammad Nouman</h4>
+                  <p className="text-gray-500 text-sm">Multan, Pakistan</p>
                 </div>
               </div>
             </motion.div>
@@ -549,13 +549,13 @@ const Home = ({ addToCart }) => {
               </p>
               <div className="flex items-center">
                 <img 
-                  src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-1.2.1&auto=format&fit=crop&w=256&q=80" 
-                  alt="Customer" 
+                  src="https://randomuser.me/api/portraits/men/36.jpg" 
+                  alt="Muhammad Rehan Riaz" 
                   className="w-12 h-12 rounded-full mr-4 object-cover"
                 />
                 <div>
-                  <h4 className="font-semibold">Sophia Martinez</h4>
-                  <p className="text-gray-500 text-sm">Satisfied Customer</p>
+                  <h4 className="font-semibold">Muhammad Rehan Riaz</h4>
+                  <p className="text-gray-500 text-sm">Chakwal, Pakistan</p>
                 </div>
               </div>
             </motion.div>
