@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaShoppingCart, FaBars, FaTimes, FaUtensils, FaUser, FaSearch, FaSignInAlt, FaUserPlus, FaSignOutAlt, FaUserCog, FaLock } from 'react-icons/fa';
+import { FaShoppingCart, FaBars, FaTimes, FaUtensils, FaUser, FaSearch, FaSignInAlt, FaUserPlus, FaSignOutAlt, FaUserCog, FaLock, FaTruck, FaShoppingBag, FaUsers } from 'react-icons/fa';
 
-const Navbar = ({ cartItems = [] }) => {
+const Navbar = ({ cartItems = [], user: propUser, setUser: parentSetUser }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCartShaking, setIsCartShaking] = useState(false);
   const [prevCartLength, setPrevCartLength] = useState(0);
@@ -15,16 +15,30 @@ const Navbar = ({ cartItems = [] }) => {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   
+  const userDropdownRef = useRef(null);
+  const location = useLocation();
   const navigate = useNavigate();
   
   useEffect(() => {
     // Check if user is logged in
     const userData = localStorage.getItem('user');
     if (userData) {
-      setUser(JSON.parse(userData));
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      if (parentSetUser) {
+        parentSetUser(parsedUser);
+      }
     }
-  }, []);
+  }, [propUser, parentSetUser]);
+  
+  // Reset state when location changes to prevent duplicate navbar issues
+  useEffect(() => {
+    setIsMenuOpen(false);
+    setSearchOpen(false);
+    setShowUserDropdown(false);
+  }, [location.pathname]);
   
   useEffect(() => {
     // Trigger cart shake animation when items are added
@@ -52,6 +66,20 @@ const Navbar = ({ cartItems = [] }) => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, [scrolled]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const totalItems = cartItems.reduce((total, item) => total + item.quantity, 0);
   
@@ -96,6 +124,10 @@ const Navbar = ({ cartItems = [] }) => {
   const handleLogout = () => {
     localStorage.removeItem('user');
     setUser(null);
+    if (parentSetUser) {
+      parentSetUser(null);
+    }
+    setShowUserDropdown(false);
     navigate('/');
   };
 
@@ -105,28 +137,35 @@ const Navbar = ({ cartItems = [] }) => {
     // Check hardcoded admin password (adminpass as defined in Login.jsx)
     if (adminPassword === 'adminpass') {
       // Store admin info in localStorage
-      localStorage.setItem('user', JSON.stringify({
+      const adminUser = {
         name: 'Admin',
-        email: 'junaidwattoo33@gmail.com',
-        isAdmin: true
-      }));
+        email: 'admin@example.com',
+        user_type: 'admin',
+        user_id: 'admin-1'
+      };
+      
+      localStorage.setItem('user', JSON.stringify(adminUser));
       
       // Update user state
-      setUser({
-        name: 'Admin',
-        email: 'junaidwattoo33@gmail.com',
-        isAdmin: true
-      });
+      setUser(adminUser);
+      if (parentSetUser) {
+        parentSetUser(adminUser);
+      }
       
       // Close modal and navigate to admin page
       setShowAdminModal(false);
       setAdminPassword('');
-      navigate('/admin/add-product');
+      navigate('/admin/dashboard');
     } else {
       setAdminError('Invalid admin password');
       setTimeout(() => setAdminError(''), 3000);
     }
   };
+
+  // Get user role
+  const userType = user?.user_type || '';
+  const isAdmin = userType === 'admin';
+  const isCustomer = userType === 'customer' || (!isAdmin && user);
 
   return (
     <motion.nav 
@@ -154,6 +193,7 @@ const Navbar = ({ cartItems = [] }) => {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center space-x-8">
+          {/* Always visible links */}
           <Link to="/" className={`hover:text-primary transition font-medium ${
             scrolled ? 'text-gray-700' : 'text-white'
           }`}>
@@ -200,41 +240,62 @@ const Navbar = ({ cartItems = [] }) => {
             </motion.span>
           </Link>
           
-          {/* Admin Button */}
-          <motion.button
-            whileHover={{ y: -2 }}
-            className={`transition font-medium ${scrolled ? 'text-gray-700' : 'text-white'} hover:text-primary relative inline-block`}
-            onClick={() => setShowAdminModal(true)}
-          >
-            <span className="flex items-center">
-              <FaUserCog className="mr-1" />
-              Admin
-            </span>
-            <motion.span
-              className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
-              whileHover={{ width: '100%' }}
-              transition={{ duration: 0.3 }}
-            />
-          </motion.button>
-          
-          {user && user.isAdmin && (
-            <Link to="/admin/add-product" className={`hover:text-primary transition font-medium ${
-              scrolled ? 'text-gray-700' : 'text-white'
-            }`}>
-              <motion.span 
-                whileHover={{ y: -2 }}
-                className="relative inline-block"
-              >
-                Admin Panel
-                <motion.span
-                  className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
-                  whileHover={{ width: '100%' }}
-                  transition={{ duration: 0.3 }}
-                />
-              </motion.span>
-            </Link>
+          {/* Admin Links */}
+          {isAdmin && (
+            <>
+              <Link to="/admin/dashboard" className={`hover:text-primary transition font-medium ${
+                scrolled ? 'text-gray-700' : 'text-white'
+              }`}>
+                <motion.span 
+                  whileHover={{ y: -2 }}
+                  className="relative inline-block"
+                >
+                  <FaUserCog className="inline-block mr-1" />
+                  Admin
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.span>
+              </Link>
+              
+              <Link to="/admin/orders" className={`hover:text-primary transition font-medium ${
+                scrolled ? 'text-gray-700' : 'text-white'
+              }`}>
+                <motion.span 
+                  whileHover={{ y: -2 }}
+                  className="relative inline-block"
+                >
+                  <FaShoppingBag className="inline-block mr-1" />
+                  Orders
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.span>
+              </Link>
+              
+              <Link to="/admin/customers" className={`hover:text-primary transition font-medium ${
+                scrolled ? 'text-gray-700' : 'text-white'
+              }`}>
+                <motion.span 
+                  whileHover={{ y: -2 }}
+                  className="relative inline-block"
+                >
+                  <FaUsers className="inline-block mr-1" />
+                  Customers
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.span>
+              </Link>
+            </>
           )}
-
+          
           {/* Search Button */}
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -248,369 +309,284 @@ const Navbar = ({ cartItems = [] }) => {
           <AnimatePresence>
             {searchOpen && (
               <motion.div 
-                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setSearchOpen(false)}
+                className="absolute top-16 left-0 right-0 bg-white shadow-lg rounded-b-lg p-4 z-50"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.2 }}
               >
-                <motion.div 
-                  className="bg-white p-6 rounded-lg w-full max-w-md"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <form onSubmit={handleSearch} className="mb-4">
-                    <div className="flex items-center border-b-2 border-primary pb-2">
-                      <FaSearch className="text-primary mr-2" />
-                      <input 
-                        type="text" 
-                        placeholder="Search for food..." 
-                        className="w-full outline-none"
-                        autoFocus
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                      <button
-                        type="submit"
-                        className="ml-2 px-4 py-1 bg-primary text-white rounded hover:bg-primary-dark transition"
+                <form onSubmit={handleSearch} className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search for food..."
+                    className="w-full p-3 pl-10 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                  <FaSearch className="absolute left-3 top-4 text-gray-400" />
+                  <button
+                    type="submit"
+                    className="absolute right-3 top-2 bg-primary text-white p-2 rounded-lg hover:bg-primary-dark transition"
+                  >
+                    Search
+                  </button>
+                </form>
+                
+                {searchResults.length > 0 && (
+                  <div className="mt-4 max-h-60 overflow-y-auto">
+                    {searchResults.map((result) => (
+                      <div
+                        key={result.id}
+                        className="p-3 hover:bg-gray-100 rounded-lg cursor-pointer flex justify-between items-center"
+                        onClick={() => handleSearchItemClick(result.id)}
                       >
-                        Search
-                      </button>
-                    </div>
-                  </form>
-                  
-                  {searchResults.length > 0 && (
-                    <div className="mt-4 max-h-60 overflow-y-auto">
-                      <h3 className="font-medium text-gray-700 mb-2">Search Results:</h3>
-                      <ul className="divide-y divide-gray-200">
-                        {searchResults.map((product) => (
-                          <li 
-                            key={product.id} 
-                            className="py-2 cursor-pointer hover:bg-gray-50"
-                            onClick={() => handleSearchItemClick(product.id)}
-                          >
-                            <div className="flex justify-between">
-                              <div>
-                                <p className="font-medium">{product.name}</p>
-                                <p className="text-sm text-gray-500">{product.category}</p>
-                              </div>
-                              <p className="font-medium">${product.price.toFixed(2)}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {searchQuery && searchResults.length === 0 && (
-                    <div className="mt-4 text-center py-3 bg-gray-50 rounded">
-                      <p className="text-gray-500">No results found for "{searchQuery}"</p>
-                    </div>
-                  )}
-                </motion.div>
+                        <div>
+                          <h4 className="font-medium">{result.name}</h4>
+                          <p className="text-sm text-gray-500">{result.category}</p>
+                        </div>
+                        <p className="font-medium text-primary">${result.price.toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
+          {/* User Menu & Auth Buttons */}
           {user ? (
-            <div className="flex items-center space-x-4">
-              <Link to="/profile">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`flex items-center ${scrolled ? 'text-gray-700' : 'text-white'} hover:text-primary`}
-                >
-                  <FaUser className="mr-1" />
-                  <span className="font-medium">{user.name.split(' ')[0]}</span>
-                </motion.div>
-              </Link>
-              
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                className={`flex items-center ${scrolled ? 'text-gray-700' : 'text-white'} hover:text-primary`}
+            <div className="relative" ref={userDropdownRef}>
+              <motion.div
+                whileHover={{ y: -2 }}
+                className={`flex items-center cursor-pointer ${
+                  scrolled ? 'text-gray-700' : 'text-white'
+                } hover:text-primary transition font-medium`}
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
               >
-                <FaSignOutAlt className="mr-1" />
-                <span className="font-medium">Logout</span>
-              </motion.button>
+                <FaUser className="mr-1" />
+                <span className="max-w-[100px] truncate">{user.username || user.name}</span>
+              </motion.div>
+              
+              {showUserDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
+                  <Link 
+                    to="/profile" 
+                    className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                    onClick={() => setShowUserDropdown(false)}
+                  >
+                    <FaUser className="inline-block mr-2" />
+                    My Profile
+                  </Link>
+                  
+                  {isCustomer && (
+                    <Link 
+                      to="/cart" 
+                      className="block px-4 py-2 text-gray-800 hover:bg-gray-100"
+                      onClick={() => setShowUserDropdown(false)}
+                    >
+                      <FaShoppingCart className="inline-block mr-2" />
+                      View Cart
+                    </Link>
+                  )}
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100"
+                  >
+                    <FaSignOutAlt className="inline-block mr-2" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center space-x-4">
-              <Link to="/login">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`flex items-center ${scrolled ? 'text-gray-700' : 'text-white'} hover:text-primary`}
+              <Link
+                to="/login"
+                className={`flex items-center hover:text-primary transition font-medium ${
+                  scrolled ? 'text-gray-700' : 'text-white'
+                }`}
+              >
+                <motion.span
+                  whileHover={{ y: -2 }}
+                  className="relative inline-block"
                 >
                   <FaSignInAlt className="mr-1" />
-                  <span className="font-medium">Login</span>
-                </motion.div>
+                  Login
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.span>
               </Link>
-              
-              <Link to="/signup">
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`${scrolled ? 'bg-primary' : 'bg-white'} ${scrolled ? 'text-white' : 'text-primary'} px-4 py-1 rounded-full flex items-center`}
+              <Link
+                to="/signup"
+                className={`flex items-center hover:text-primary transition font-medium ${
+                  scrolled ? 'text-gray-700' : 'text-white'
+                }`}
+              >
+                <motion.span
+                  whileHover={{ y: -2 }}
+                  className="relative inline-block"
                 >
                   <FaUserPlus className="mr-1" />
-                  <span className="font-medium">Sign Up</span>
-                </motion.div>
+                  Sign Up
+                  <motion.span
+                    className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary"
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </motion.span>
               </Link>
             </div>
           )}
 
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <Link 
-              to="/cart" 
-              className={`text-white bg-primary hover:bg-primary-dark px-5 py-2 rounded-full flex items-center 
-                        ${isCartShaking ? 'cart-shake' : ''} shadow-md transition-all duration-300`}
-            >
-              <motion.div className="relative">
-                <FaShoppingCart className="mr-2" />
+          {/* Cart Icon - Only show for customers */}
+          {(isCustomer || !user) && (
+            <Link to="/cart" className="relative">
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                animate={isCartShaking ? { rotate: [0, -10, 10, -10, 10, 0] } : {}}
+                transition={{ duration: 0.5 }}
+                className={`p-2 rounded-full ${
+                  scrolled 
+                    ? 'bg-primary text-white' 
+                    : 'bg-white text-primary'
+                }`}
+              >
+                <FaShoppingCart />
                 {totalItems > 0 && (
-                  <motion.span 
-                    className="absolute -top-2 -right-2 bg-white text-primary text-xs rounded-full h-4 w-4 flex items-center justify-center"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                  >
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
                     {totalItems}
-                  </motion.span>
+                  </span>
                 )}
               </motion.div>
-              <span>Cart</span>
             </Link>
-          </motion.div>
+          )}
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="md:hidden flex items-center z-20">
-          <Link 
-            to="/cart" 
-            className={`text-white bg-primary p-2 rounded-full mr-4 relative ${isCartShaking ? 'cart-shake' : ''}`}
-          >
-            <FaShoppingCart />
-            {totalItems > 0 && (
-              <motion.span 
-                className="absolute -top-1 -right-1 bg-white text-primary text-xs rounded-full h-5 w-5 flex items-center justify-center"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 20 }}
+        {/* Mobile Menu Toggle */}
+        <div className="md:hidden flex items-center gap-4 z-20">
+          {(isCustomer || !user) && (
+            <Link to="/cart" className="relative">
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                animate={isCartShaking ? { rotate: [0, -10, 10, -10, 10, 0] } : {}}
+                transition={{ duration: 0.5 }}
+                className={`p-2 rounded-full ${
+                  scrolled 
+                    ? 'bg-primary text-white' 
+                    : 'bg-white text-primary'
+                }`}
               >
-                {totalItems}
-              </motion.span>
-            )}
-          </Link>
-          <motion.button 
+                <FaShoppingCart />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    {totalItems}
+                  </span>
+                )}
+              </motion.div>
+            </Link>
+          )}
+          
+          <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className={`${scrolled ? 'text-gray-700' : 'text-white'} focus:outline-none z-50`}
-            whileTap={{ scale: 0.9 }}
+            className={`${scrolled ? 'text-gray-700' : 'text-white'} focus:outline-none`}
           >
-            {isMenuOpen ? 
-              <FaTimes size={24} className="text-white" /> : 
-              <FaBars size={24} />
-            }
-          </motion.button>
+            {isMenuOpen ? (
+              <FaTimes className="text-2xl" />
+            ) : (
+              <FaBars className="text-2xl" />
+            )}
+          </button>
         </div>
-      </div>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div 
-            className="md:hidden bg-primary fixed inset-0 z-40 flex flex-col justify-center items-center"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", duration: 0.3 }}
-          >
-            <div className="flex flex-col space-y-6 text-center">
-              <Link 
-                to="/" 
-                className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link 
-                to="/menu" 
-                className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Menu
-              </Link>
-              <Link 
-                to="/contact" 
-                className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Contact
-              </Link>
-              
-              {/* Mobile Admin Button */}
-              <button 
-                className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  setShowAdminModal(true);
-                }}
-              >
-                Admin
-              </button>
-              
-              {user && user.isAdmin && (
-                <Link 
-                  to="/admin/add-product" 
-                  className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Admin Panel
-                </Link>
-              )}
-              
-              {user ? (
-                <>
-                  <Link 
-                    to="/profile" 
-                    className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    My Profile
-                  </Link>
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      setIsMenuOpen(false);
-                    }}
-                    className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                  >
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link 
-                    to="/login" 
-                    className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Login
-                  </Link>
-                  <Link 
-                    to="/signup" 
-                    className="text-white text-2xl font-semibold py-2 hover:text-yellow-300 transition duration-300"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              )}
-              <div className="pt-6">
-                <button
-                  className="bg-white text-primary px-8 py-3 rounded-full font-semibold hover:bg-yellow-300 transition duration-300"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    setSearchOpen(true);
-                  }}
-                >
-                  <FaSearch className="inline mr-2" /> Search
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Admin Login Modal */}
-      <AnimatePresence>
-        {showAdminModal && (
-          <motion.div 
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowAdminModal(false)}
-          >
-            <motion.div 
-              className="bg-white p-8 rounded-lg w-full max-w-md shadow-xl"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="fixed top-0 left-0 right-0 bg-white shadow-lg z-10 mt-16 overflow-hidden"
             >
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FaUserCog className="text-primary text-3xl" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800">Admin Access</h2>
-                <p className="text-gray-600 mt-1">Enter admin password to continue</p>
-              </div>
-              
-              {adminError && (
-                <motion.div 
-                  className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  <strong className="font-bold">Error!</strong>
-                  <span className="block sm:inline"> {adminError}</span>
-                </motion.div>
-              )}
-              
-              <form onSubmit={handleAdminLogin}>
-                <div className="mb-6">
-                  <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="adminPassword">
-                    Admin Password
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FaLock className="text-gray-400" />
-                    </div>
-                    <input
-                      id="adminPassword"
-                      type="password"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-                </div>
+              <div className="container mx-auto py-6 px-6 flex flex-col space-y-4">
+                <Link to="/" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                  Home
+                </Link>
+                <Link to="/menu" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                  Menu
+                </Link>
+                <Link to="/contact" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                  Contact
+                </Link>
                 
-                <div className="flex justify-between">
-                  <motion.button
-                    type="button"
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowAdminModal(false)}
-                  >
-                    Cancel
-                  </motion.button>
-                  
-                  <motion.button
-                    type="submit"
-                    className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    Login
-                  </motion.button>
-                </div>
-              </form>
+                {/* Admin Links */}
+                {isAdmin && (
+                  <>
+                    <Link to="/admin/dashboard" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                      <FaUserCog className="inline-block mr-2" />
+                      Admin
+                    </Link>
+                    
+                    <Link to="/admin/orders" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                      <FaShoppingBag className="inline-block mr-2" />
+                      Orders
+                    </Link>
+                    
+                    <Link to="/admin/customers" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                      <FaUsers className="inline-block mr-2" />
+                      Customers
+                    </Link>
+                  </>
+                )}
+                
+                {/* User Profile and Auth */}
+                {user ? (
+                  <>
+                    <Link to="/profile" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                      <FaUser className="inline-block mr-2" />
+                      My Profile
+                    </Link>
+                    {isCustomer && (
+                      <Link to="/cart" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                        <FaShoppingCart className="inline-block mr-2" />
+                        View Cart
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setIsMenuOpen(false);
+                      }}
+                      className="p-2 hover:bg-gray-100 rounded-lg text-left"
+                    >
+                      <FaSignOutAlt className="inline-block mr-2" />
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                      <FaSignInAlt className="inline-block mr-2" />
+                      Login
+                    </Link>
+                    <Link to="/signup" className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsMenuOpen(false)}>
+                      <FaUserPlus className="inline-block mr-2" />
+                      Sign Up
+                    </Link>
+                  </>
+                )}
+              </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
     </motion.nav>
   );
 };

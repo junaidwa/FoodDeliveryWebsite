@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaUser, FaLock, FaEnvelope } from 'react-icons/fa';
+import { FaUser, FaLock, FaEnvelope, FaEye, FaEyeSlash } from 'react-icons/fa';
 import Navbar from '../components/Navbar';
+import { authAPI } from '../lib/api';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -13,6 +14,8 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('Invalid email or password.');
+  const [showPassword, setShowPassword] = useState(false);
   
   const navigate = useNavigate();
   
@@ -30,6 +33,10 @@ const Login = () => {
         [name]: ''
       });
     }
+  };
+  
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
   
   const validateForm = () => {
@@ -53,42 +60,34 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
       setLoading(true);
       
-      // Simulate API call
-      setTimeout(() => {
-        setLoading(false);
+      try {
+        // Use API for authentication
+        const response = await authAPI.login(formData.email, formData.password);
         
-        // Check if it's admin login (for demo purposes)
-        if (formData.email === 'junaidwattoo33@gmail.com' && formData.password === 'adminpass') {
-          // Store admin info in localStorage
-          localStorage.setItem('user', JSON.stringify({
-            name: 'Admin',
-            email: 'junaidwattoo33@gmail.com',
-            isAdmin: true
-          }));
-          navigate('/admin/add-product');
-          return;
-        }
+        // Store user data in localStorage
+        localStorage.setItem('user', JSON.stringify(response.user));
         
-        // Check if user exists (for demo, check localStorage)
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const user = users.find(u => u.email === formData.email);
+        // Redirect based on user_type
+        const userType = response.user.user_type || 'customer';
         
-        if (user && user.password === formData.password) {
-          // Store user info in localStorage (excluding password)
-          const { password, ...userInfo } = user;
-          localStorage.setItem('user', JSON.stringify(userInfo));
-          navigate('/');
+        if (userType === 'admin') {
+          navigate('/admin/dashboard');
         } else {
-          setShowError(true);
-          setTimeout(() => setShowError(false), 3000);
+          navigate('/menu');
         }
-      }, 1500);
+      } catch (error) {
+        setErrorMessage(error.message || 'Invalid email or password.');
+        setShowError(true);
+        setTimeout(() => setShowError(false), 3000);
+      } finally {
+        setLoading(false);
+      }
     }
   };
   
@@ -132,7 +131,7 @@ const Login = () => {
                   exit={{ opacity: 0, height: 0 }}
                 >
                   <strong className="font-bold">Error!</strong>
-                  <span className="block sm:inline"> Invalid email or password.</span>
+                  <span className="block sm:inline"> {errorMessage}</span>
                 </motion.div>
               )}
               
@@ -168,13 +167,22 @@ const Login = () => {
                     </div>
                     <input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      className={`block w-full pl-10 pr-3 py-3 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                      className={`block w-full pl-10 pr-10 py-3 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
                       placeholder="••••••••"
                     />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                      >
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                      </button>
+                    </div>
                   </div>
                   {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
                 </div>

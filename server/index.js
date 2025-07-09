@@ -3,14 +3,20 @@ const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173', // Update with your frontend URL
+  credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 // Database connection configuration
 const dbConfig = {
@@ -28,10 +34,9 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Middleware to verify JWT token
+// Middleware to verify JWT token from cookie
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = req.cookies.token;
   
   if (!token) return res.status(401).json({ message: 'Unauthorized' });
   
@@ -83,12 +88,19 @@ app.post('/api/auth/register', async (req, res) => {
     const token = jwt.sign(
       { id: result.insertId, email, role: 'user' },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
+    
+    // Set token as a cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: COOKIE_MAX_AGE,
+      sameSite: 'lax'
+    });
     
     res.status(201).json({
       message: 'User registered successfully',
-      token,
       user: {
         id: result.insertId,
         name,
@@ -125,11 +137,18 @@ app.post('/api/auth/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '7d' }
     );
     
+    // Set token as a cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: COOKIE_MAX_AGE,
+      sameSite: 'lax'
+    });
+    
     res.status(200).json({
-      token,
       user: {
         id: user.id,
         name: user.name,
@@ -139,6 +158,28 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Logout route
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.status(200).json({ message: 'Logged out successfully' });
+});
+
+// Get current user
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const [users] = await pool.execute('SELECT id, name, email, role FROM users WHERE id = ?', [req.user.id]);
+    
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.status(200).json(users[0]);
+  } catch (error) {
+    console.error('Error getting current user:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

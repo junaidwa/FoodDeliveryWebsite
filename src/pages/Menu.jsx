@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FaFilter, FaSearch, FaUtensils } from 'react-icons/fa';
 import Navbar from '../components/Navbar';
 import FoodCard from '../components/FoodCard';
+import { productAPI } from '../lib/api';
 
 const Menu = ({ addToCart }) => {
   const [menuItems, setMenuItems] = useState([]);
@@ -11,103 +12,54 @@ const Menu = ({ addToCart }) => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Simulating API call to fetch menu items
+    // Fetch menu items from the backend API
     const fetchMenuItems = async () => {
+      setIsLoading(true);
+      setError(null);
+      
       try {
-        // In production this would be a real API call
-        // const response = await fetch('/api/menu-items');
-        // const data = await response.json();
+        // Fetch products from the API
+        const products = await productAPI.getAll();
         
-        // Using static data for now
-        const dummyMenuItems = [
-          {
-            id: 1,
-            name: 'Margherita Pizza',
-            price: 12.99,
-            image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Pizza',
-            description: 'Classic pizza with tomato sauce, mozzarella, and basil',
-            isVegetarian: true
-          },
-          {
-            id: 2,
-            name: 'Pepperoni Pizza',
-            price: 14.99,
-            image: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Pizza',
-            description: 'Pizza topped with spicy pepperoni and extra cheese',
-            isVegetarian: false
-          },
-          {
-            id: 3,
-            name: 'Chicken Burger',
-            price: 9.99,
-            image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Burger',
-            description: 'Juicy chicken patty with lettuce, tomato, and special sauce',
-            isVegetarian: false
-          },
-          {
-            id: 4,
-            name: 'Veggie Burger',
-            price: 8.99,
-            image: 'https://images.unsplash.com/photo-1550317138-10000687a72b?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Burger',
-            description: 'Plant-based patty with fresh vegetables and vegan mayo',
-            isVegetarian: true
-          },
-          {
-            id: 5,
-            name: 'Caesar Salad',
-            price: 8.99,
-            image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Salad',
-            description: 'Fresh romaine lettuce, croutons, parmesan, and Caesar dressing',
-            isVegetarian: true
-          },
-          {
-            id: 6,
-            name: 'Greek Salad',
-            price: 9.99,
-            image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Salad',
-            description: 'Tomatoes, cucumbers, olives, feta cheese, and olive oil dressing',
-            isVegetarian: true
-          },
-          {
-            id: 7,
-            name: 'Chocolate Brownie',
-            price: 5.99,
-            image: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Dessert',
-            description: 'Rich chocolate brownie with vanilla ice cream',
-            isVegetarian: true
-          },
-          {
-            id: 8,
-            name: 'Cheesecake',
-            price: 6.99,
-            image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-            category: 'Dessert',
-            description: 'Creamy cheesecake with berry compote',
-            isVegetarian: true
-          }
-        ];
+        // Map the API response to match our frontend structure
+        const formattedProducts = products.map(product => ({
+          id: product.item_id,
+          product_id: product.item_id,
+          name: product.name,
+          price: parseFloat(product.price),
+          image: product.image || `https://via.placeholder.com/300x200/f2f2f2/cccccc?text=${encodeURIComponent(product.name)}`,
+          category: product.category || 'Other',
+          description: product.description || `Delicious ${product.name}`,
+          isVegetarian: false, // Default value, add to your database if needed
+          restaurant_id: product.restaurant_id,
+          is_available: product.is_available
+        }));
 
-        // Extract unique categories
-        const uniqueCategories = ['All', ...new Set(dummyMenuItems.map(item => item.category))];
+        console.log('Fetched products:', formattedProducts);
         
-        // Simulate loading delay
-        setTimeout(() => {
-          setMenuItems(dummyMenuItems);
-          setFilteredItems(dummyMenuItems);
-          setCategories(uniqueCategories);
-          setIsLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching menu items:', error);
+        // Filter out unavailable products
+        const availableProducts = formattedProducts.filter(product => 
+          product.is_available !== false
+        );
+        
+        // Extract unique categories
+        const uniqueCategories = ['All', ...new Set(availableProducts.map(item => item.category).filter(Boolean))];
+        
+        setMenuItems(availableProducts);
+        setFilteredItems(availableProducts);
+        setCategories(uniqueCategories);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError('Failed to load menu items. Please try again later.');
+        
+        // Fallback to empty data
+        setMenuItems([]);
+        setFilteredItems([]);
+        setCategories(['All']);
+      } finally {
         setIsLoading(false);
       }
     };
@@ -230,6 +182,14 @@ const Menu = ({ addToCart }) => {
             </div>
           </div>
           
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6">
+              <strong className="font-bold">Error!</strong>
+              <span className="block sm:inline"> {error}</span>
+            </div>
+          )}
+          
           {/* Menu Items */}
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
@@ -249,8 +209,17 @@ const Menu = ({ addToCart }) => {
             >
               {filteredItems.map(item => (
                 <motion.div key={item.id} variants={itemVariants}>
-                  <FoodCard 
-                    {...item}
+                  <FoodCard
+                    id={item.id}
+                    product_id={item.product_id || item.id}
+                    name={item.name}
+                    price={item.price}
+                    image={item.image}
+                    category={item.category}
+                    description={item.description}
+                    isVegetarian={item.isVegetarian}
+                    item_id={item.item_id || item.id}
+                    restaurant_id={item.restaurant_id}
                     addToCart={addToCart}
                   />
                 </motion.div>
@@ -258,10 +227,10 @@ const Menu = ({ addToCart }) => {
             </motion.div>
           ) : (
             <div className="text-center py-16">
-              <FaFilter className="mx-auto text-4xl text-gray-400 mb-4" />
-              <h3 className="text-2xl font-semibold text-gray-700 mb-2">No items found</h3>
+              <FaUtensils className="mx-auto text-gray-300 mb-4" size={48} />
+              <h3 className="text-xl font-semibold mb-2 text-gray-700">No items found</h3>
               <p className="text-gray-500">
-                Try changing your search term or selecting a different category.
+                Try adjusting your search or category filter.
               </p>
             </div>
           )}

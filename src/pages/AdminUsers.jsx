@@ -1,14 +1,51 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FaUserCog, FaChevronLeft, FaUser, FaEnvelope, FaPhone, FaCalendarAlt, FaTrash, FaUserShield } from 'react-icons/fa';
+import { FaUserCog, FaChevronLeft, FaUser, FaEnvelope, FaPhone, FaCalendarAlt, FaTrash, FaUserShield, FaCrown, FaShoppingBag, FaUserTag, FaTruckMoving, FaSearch, FaFilter, FaExclamationCircle } from 'react-icons/fa';
 import Navbar from '../components/Navbar';
+import { userAPI } from '../lib/api';
+import { toast } from 'react-toastify';
+
+// User Role Badge Component
+const UserRoleBadge = ({ role }) => {
+  const getRoleBadgeStyle = (role) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'customer':
+        return 'bg-green-100 text-green-700 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  const getRoleIcon = (role) => {
+    switch (role) {
+      case 'admin':
+        return <FaUserCog className="mr-1" />;
+      case 'customer':
+        return <FaUser className="mr-1" />;
+      default:
+        return <FaUser className="mr-1" />;
+    }
+  };
+
+  return (
+    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeStyle(role)}`}>
+      {getRoleIcon(role)}
+      {role.charAt(0).toUpperCase() + role.slice(1)}
+    </span>
+  );
+};
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterText, setFilterText] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -34,10 +71,34 @@ const AdminUsers = () => {
     
     if (usersData) {
       setUsers(JSON.parse(usersData));
+      setFilteredUsers(JSON.parse(usersData));
     }
     
     setLoading(false);
   }, [navigate]);
+  
+  // Apply filters when search term or role filter changes
+  useEffect(() => {
+    // Apply filters
+    let result = users;
+
+    // Filter by search term (name, email, phone)
+    if (searchTerm) {
+      const lowercaseSearch = searchTerm.toLowerCase();
+      result = result.filter(user => 
+        user.username?.toLowerCase().includes(lowercaseSearch) ||
+        user.email?.toLowerCase().includes(lowercaseSearch) ||
+        user.phone?.includes(lowercaseSearch)
+      );
+    }
+
+    // Filter by role
+    if (roleFilter !== 'all') {
+      result = result.filter(user => user.user_type === roleFilter);
+    }
+
+    setFilteredUsers(result);
+  }, [searchTerm, roleFilter, users]);
   
   const handlePromoteToAdmin = (userId) => {
     const updatedUsers = users.map(user => {
@@ -51,28 +112,63 @@ const AdminUsers = () => {
     localStorage.setItem('users', JSON.stringify(updatedUsers));
   };
   
-  const handleDeleteUser = (userId) => {
-    const filteredUsers = users.filter(user => user.id !== userId);
-    setUsers(filteredUsers);
-    localStorage.setItem('users', JSON.stringify(filteredUsers));
-    setConfirmDelete(null);
+  const handleDeleteUser = async (userId) => {
+    try {
+      // Display confirmation dialog
+      if (deleteConfirm !== userId) {
+        // First click just shows confirmation
+        setDeleteConfirm(userId);
+        return;
+      }
+
+      // Confirm clicked, proceed with deletion
+      setLoading(true);
+      await userAPI.deleteUser(userId);
+      
+      // Update users list
+      setUsers(users.filter(user => user.user_id !== userId));
+      setDeleteConfirm(null);
+      toast.success('User deleted successfully. All associated orders and messages have been removed.');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const getFilteredUsers = () => {
-    return users.filter(user => {
-      const searchText = filterText.toLowerCase();
-      return (
-        user.name.toLowerCase().includes(searchText) ||
-        user.email.toLowerCase().includes(searchText) ||
-        (user.phone && user.phone.toLowerCase().includes(searchText))
-      );
-    });
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const options = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
   };
   
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-16 h-16 border-t-4 border-primary border-solid rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center p-8 max-w-md">
+          <FaExclamationCircle className="text-red-500 text-5xl mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">Error</h2>
+          <p className="text-gray-600 mb-8">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition"
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     );
   }
@@ -120,30 +216,59 @@ const AdminUsers = () => {
             </div>
           </div>
           
-          {/* Search Filter */}
-          <div className="mb-6">
-            <input
-              type="text"
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              placeholder="Search users by name, email, or phone..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
+          {/* Filters and Search */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="relative flex-grow">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FaSearch className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search users by name, email, or phone..."
+                  className="pl-10 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex items-center">
+                <FaFilter className="text-gray-400 mr-2" />
+                <select
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  <option value="all">All Roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="customer">Customer</option>
+                </select>
+              </div>
+            </div>
           </div>
           
           {/* Users List */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            {users.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <div className="text-center py-16">
                 <FaUser className="mx-auto text-4xl text-gray-300 mb-4" />
                 <h3 className="text-xl font-semibold text-gray-700 mb-2">No Users Found</h3>
-                <p className="text-gray-500">There are no registered users yet.</p>
-              </div>
-            ) : getFilteredUsers().length === 0 ? (
-              <div className="text-center py-16">
-                <FaUser className="mx-auto text-4xl text-gray-300 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">No Matching Users</h3>
-                <p className="text-gray-500">No users match your search criteria.</p>
+                <p className="text-gray-500">
+                  {searchTerm || roleFilter !== 'all' 
+                    ? 'No users match your search or filter criteria.'
+                    : 'There are no users in the system yet.'}
+                </p>
+                {(searchTerm || roleFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setRoleFilter('all');
+                    }}
+                    className="px-6 py-3 bg-primary text-white rounded-md hover:bg-primary-dark transition duration-300"
+                  >
+                    Clear Filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -168,9 +293,9 @@ const AdminUsers = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {getFilteredUsers().map((user) => (
+                    {filteredUsers.map((user) => (
                       <motion.tr
-                        key={user.id}
+                        key={user.user_id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.3 }}
@@ -182,7 +307,7 @@ const AdminUsers = () => {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {user.name}
+                                {user.username}
                               </div>
                               <div className="text-sm text-gray-500">
                                 {user.email}
@@ -199,34 +324,26 @@ const AdminUsers = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {user.isAdmin ? (
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                              Admin
-                            </span>
-                          ) : (
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                              User
-                            </span>
-                          )}
+                          <UserRoleBadge role={user.user_type} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div className="flex items-center">
                             <FaCalendarAlt className="text-gray-400 mr-2" />
-                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                            {formatDate(user.created_at)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          {confirmDelete === user.id ? (
+                          {deleteConfirm === user.user_id ? (
                             <div className="flex items-center justify-end space-x-2">
                               <span className="text-red-600 text-xs mr-2">Delete?</span>
                               <button
-                                onClick={() => handleDeleteUser(user.id)}
+                                onClick={() => handleDeleteUser(user.user_id)}
                                 className="text-xs bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded"
                               >
                                 Yes
                               </button>
                               <button
-                                onClick={() => setConfirmDelete(null)}
+                                onClick={() => setDeleteConfirm(null)}
                                 className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded"
                               >
                                 No
@@ -236,7 +353,7 @@ const AdminUsers = () => {
                             <div className="flex items-center justify-end space-x-3">
                               {!user.isAdmin && (
                                 <button
-                                  onClick={() => handlePromoteToAdmin(user.id)}
+                                  onClick={() => handlePromoteToAdmin(user.user_id)}
                                   className="text-blue-600 hover:text-blue-900"
                                   title="Promote to Admin"
                                 >
@@ -244,7 +361,7 @@ const AdminUsers = () => {
                                 </button>
                               )}
                               <button
-                                onClick={() => setConfirmDelete(user.id)}
+                                onClick={() => setDeleteConfirm(user.user_id)}
                                 className="text-red-600 hover:text-red-900"
                                 title="Delete User"
                               >

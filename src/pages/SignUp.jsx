@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaUser, FaLock, FaEnvelope, FaPhone, FaCheckCircle } from 'react-icons/fa';
+import { FaUser, FaLock, FaEnvelope, FaPhone, FaCheckCircle, FaMapMarkerAlt, FaEye, FaEyeSlash, FaUserShield } from 'react-icons/fa';
 import Navbar from '../components/Navbar';
+import { authAPI } from '../lib/api';
 
 const SignUp = () => {
   const [formData, setFormData] = useState({
@@ -11,11 +12,17 @@ const SignUp = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    address: '',
+    user_type: 'customer', // Default role is customer
   });
   
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showApiError, setShowApiError] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const navigate = useNavigate();
   
@@ -33,6 +40,14 @@ const SignUp = () => {
         [name]: ''
       });
     }
+  };
+  
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+  
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword(!showConfirmPassword);
   };
   
   const validateForm = () => {
@@ -75,40 +90,24 @@ const SignUp = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
       setLoading(true);
       
-      // Simulate API call
-      setTimeout(() => {
-        setLoading(false);
-        
-        // Check if email already exists
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const emailExists = users.some(user => user.email === formData.email);
-        
-        if (emailExists) {
-          setErrors({
-            ...errors,
-            email: 'Email is already registered'
-          });
-          return;
-        }
-        
-        // Store user in localStorage (in a real app, this would be a backend API call)
-        const newUser = {
-          id: Date.now(),
+      try {
+        // Use API for registration
+        const userData = {
           name: formData.name,
           email: formData.email,
+          password: formData.password,
           phone: formData.phone,
-          password: formData.password, // In real app, NEVER store passwords in plain text
-          isAdmin: false,
-          createdAt: new Date().toISOString()
+          address: formData.address,
+          user_type: formData.user_type
         };
         
-        localStorage.setItem('users', JSON.stringify([...users, newUser]));
+        await authAPI.register(userData);
         
         // Show success message
         setSuccess(true);
@@ -117,7 +116,20 @@ const SignUp = () => {
         setTimeout(() => {
           navigate('/login');
         }, 2000);
-      }, 1500);
+      } catch (error) {
+        if (error.message && error.message.includes('already exists')) {
+          setErrors({
+            ...errors,
+            email: 'Email is already registered'
+          });
+        } else {
+          setApiError(error.message || 'Registration failed. Please try again.');
+          setShowApiError(true);
+          setTimeout(() => setShowApiError(false), 3000);
+        }
+      } finally {
+        setLoading(false);
+      }
     }
   };
   
@@ -176,6 +188,18 @@ const SignUp = () => {
                 </div>
                 
                 <div className="p-8">
+                  {showApiError && (
+                    <motion.div 
+                      className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                    >
+                      <strong className="font-bold">Error!</strong>
+                      <span className="block sm:inline"> {apiError}</span>
+                    </motion.div>
+                  )}
+                  
                   <form onSubmit={handleSubmit}>
                     <div className="mb-5">
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="name">
@@ -250,18 +274,27 @@ const SignUp = () => {
                         </div>
                         <input
                           id="password"
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           name="password"
                           value={formData.password}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-3 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          className={`block w-full pl-10 pr-10 py-3 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
                           placeholder="••••••••"
                         />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                          <button
+                            type="button"
+                            onClick={togglePasswordVisibility}
+                            className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                          >
+                            {showPassword ? <FaEyeSlash /> : <FaEye />}
+                          </button>
+                        </div>
                       </div>
                       {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
                     </div>
                     
-                    <div className="mb-6">
+                    <div className="mb-5">
                       <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="confirmPassword">
                         Confirm Password
                       </label>
@@ -271,15 +304,65 @@ const SignUp = () => {
                         </div>
                         <input
                           id="confirmPassword"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           name="confirmPassword"
                           value={formData.confirmPassword}
                           onChange={handleChange}
-                          className={`block w-full pl-10 pr-3 py-3 border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
+                          className={`block w-full pl-10 pr-10 py-3 border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary`}
                           placeholder="••••••••"
                         />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                          <button
+                            type="button"
+                            onClick={toggleConfirmPasswordVisibility}
+                            className="text-gray-400 hover:text-gray-500 focus:outline-none"
+                          >
+                            {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                          </button>
+                        </div>
                       </div>
                       {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>}
+                    </div>
+
+                    <div className="mb-5">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="user_type">
+                        Account Type
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaUserShield className="text-gray-400" />
+                        </div>
+                        <select
+                          id="user_type"
+                          name="user_type"
+                          value={formData.user_type}
+                          onChange={handleChange}
+                          className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                        >
+                          <option value="customer">Customer</option>
+                          <option value="admin">Administrator</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-5">
+                      <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="address">
+                        Address (optional)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <FaMapMarkerAlt className="text-gray-400" />
+                        </div>
+                        <input
+                          id="address"
+                          type="text"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleChange}
+                          className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                          placeholder="123 Main St, City, Country"
+                        />
+                      </div>
                     </div>
                     
                     <div className="mb-6">
@@ -291,16 +374,12 @@ const SignUp = () => {
                         disabled={loading}
                       >
                         {loading ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Creating account...
-                          </>
-                        ) : (
-                          'Create Account'
-                        )}
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : null}
+                        {loading ? 'Creating Account...' : 'Create Account'}
                       </motion.button>
                     </div>
                   </form>
@@ -308,7 +387,7 @@ const SignUp = () => {
                   <div className="text-sm text-center text-gray-600">
                     Already have an account?{' '}
                     <Link to="/login" className="font-medium text-primary hover:text-primary-dark">
-                      Sign in
+                      Sign in instead
                     </Link>
                   </div>
                 </div>
